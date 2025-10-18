@@ -14,12 +14,14 @@ from .serializers import (
     PostSerializer,
     PostCreateSerializer,
     PageSerializer,
+    CommentSerializer,
 )
-from .models import Post, Role, Page
+from .models import Post, Role, Page, Comment
 from django.utils.text import slugify
 from django.utils import timezone
 from django.db import models
 from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
 
 
 @api_view(['GET'])
@@ -345,3 +347,73 @@ class PageViewSet(viewsets.ModelViewSet):
         if count:
             slug = f"{slug}-{count+1}"
         serializer.save(author=self.request.user, slug=slug, status='draft')
+
+
+class CommentViewSet(viewsets.GenericViewSet):
+    queryset = Comment.objects.filter(is_deleted=False)
+    serializer_class = CommentSerializer
+
+    # 1️ Add Comment
+    @action(detail=True,
+            methods=['post'], url_path='comments', url_name='add_comment')
+    def add_comment(self, request, pk=None):
+        """POST /posts/{post_id}/comments"""
+        post = get_object_or_404(
+            Post, pk=pk, is_deleted=False, status='published')
+        serializer = CommentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            object_type='post', object_id=post.id, is_approved=False)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    # 2️ List Comments (Public)
+    @action(detail=True, methods=['get'],
+            url_path='comments', url_name='list_comments')
+    def list_comments(self, request, pk=None):
+        """GET /posts/{post_id}/comments"""
+        post = get_object_or_404(
+            Post, pk=pk, is_deleted=False, status='published')
+        comments = Comment.objects.filter(
+            object_type='post', object_id=post.id,
+            is_approved=True, is_deleted=False)
+        page = self.paginate_queryset(comments)
+        serializer = CommentSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class ModerateCommentViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def has_permission_key(self, user, key):
+        return any(
+            p.key == key
+            for r in user.roles.all() for p in r.permissions.all())
+
+    # 3️ Moderate Comment
+    def partial_update(self, request, pk=None):
+        """PATCH /comments/{id}/moderate"""
+        comment = get_object_or_404(Comment, pk=pk, is_deleted=False)
+        if not self.has_permission_key(request.user, 'comment.moderate'):
+            return Response(
+                {'detail': 'Forbidden'},
+                status=status.HTTP_403_FORBIDDEN)
+        comment.is_approved = request.data.get(
+            'is_approved',
+            comment.is_approved)
+        comment.save()
+        return Response(
+            {'id': comment.id,
+             'is_approved': comment.is_approved},
+            status=status.HTTP_200_OK)
+
+    # 4️ Delete Comment
+    def destroy(self, request, pk=None):
+        """DELETE /comments/{id}"""
+        comment = get_object_or_404(Comment, pk=pk, is_deleted=False)
+        if not self.has_permission_key(request.user, 'comment.moderate'):
+            return Response(
+                {'detail': 'Forbidden'},
+                status=status.HTTP_403_FORBIDDEN)
+        comment.is_deleted = True
+        comment.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)

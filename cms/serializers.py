@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Role, Post, Page
+from .models import Role, Post, Page, Comment
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
@@ -74,3 +74,13 @@ class PageSerializer(serializers.ModelSerializer):
         model = Page
         fields = ['id', 'title', 'slug', 'body', 'status', 'author_id',
                   'published_at', 'created_at', 'updated_at', 'is_deleted']
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = [
+            'id', 'object_type', 'object_id', 'author_name', 'author_email',
+            'body', 'is_approved', 'is_deleted', 'created_at'
+        ]
+        read_only_fields = ['is_approved', 'is_deleted', 'created_at']

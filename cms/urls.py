@@ -8,6 +8,8 @@ from .views import (
     assign_role_to_user,
     PostViewSet,
     PageViewSet,
+    CommentViewSet,
+    ModerateCommentViewSet,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -22,6 +24,16 @@ page_list = PageViewSet.as_view({
 
 page_detail = PageViewSet.as_view({
     'get': 'retrieve',
+    'patch': 'partial_update',
+    'delete': 'destroy'
+})
+
+comment_view = CommentViewSet.as_view({
+    'post': 'add_comment',
+    'get': 'list_comments'
+})
+
+moderate_comment_view = ModerateCommentViewSet.as_view({
     'patch': 'partial_update',
     'delete': 'destroy'
 })
@@ -49,4 +61,8 @@ urlpatterns = [
 
     path('pages/', page_list, name='page-list'),
     path('pages/<int:pk>/', page_detail, name='page-detail'),
+
+    path('posts/<int:pk>/comments/', comment_view, name='post-comments'),
+    path('comments/<int:pk>/moderate/',
+         moderate_comment_view, name='moderate-comment'),
 ]
