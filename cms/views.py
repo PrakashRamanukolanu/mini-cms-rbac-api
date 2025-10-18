@@ -8,6 +8,7 @@ from .permissions_utils import user_has_perm, user_role_names
 from rest_framework.response import Response
 from rest_framework import status, viewsets
 from rest_framework_simplejwt.views import TokenObtainPairView
+from drf_spectacular.utils import extend_schema
 from .serializers import (
     UserRegistrationSerializer,
     CustomTokenObtainPairSerializer,
@@ -111,6 +112,15 @@ def assign_role_to_user(request, user_id):
 
 class PostViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
+    serializer_class = PostSerializer
+    
+    def get_serializer_class(self):
+        """Return appropriate serializer class based on action."""
+        if self.action == 'create':
+            return PostCreateSerializer
+        elif self.action == 'partial_update':
+            return PostCreateSerializer
+        return PostSerializer
 
     def list(self, request):
         qs = Post.objects.filter(is_deleted=False)
@@ -140,6 +150,10 @@ class PostViewSet(viewsets.ViewSet):
         serializer = PostSerializer(qs, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        request=PostCreateSerializer,
+        responses={201: PostSerializer}
+    )
     def create(self, request):
         if not user_has_perm(request.user, 'content.create'):
             return Response(
@@ -186,6 +200,10 @@ class PostViewSet(viewsets.ViewSet):
 
         return Response(PostSerializer(post).data)
 
+    @extend_schema(
+        request=PostCreateSerializer,
+        responses={200: PostSerializer}
+    )
     def partial_update(self, request, pk=None):
         """PATCH /posts/{id}"""
         try:
@@ -214,6 +232,9 @@ class PostViewSet(viewsets.ViewSet):
         serializer.save()
         return Response(PostSerializer(post).data)
 
+    @extend_schema(
+        responses={200: {'type': 'object', 'properties': {'detail': {'type': 'string'}}}}
+    )
     @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
         """POST /posts/{id}/submit"""
@@ -238,6 +259,9 @@ class PostViewSet(viewsets.ViewSet):
             {'detail': 'Invalid status'},
             status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        responses={200: {'type': 'object', 'properties': {'detail': {'type': 'string'}}}}
+    )
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
         """POST /posts/{id}/publish"""
@@ -265,6 +289,9 @@ class PostViewSet(viewsets.ViewSet):
             {'detail': 'Cannot publish from current status'},
             status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        responses={200: {'type': 'object', 'properties': {'detail': {'type': 'string'}}}}
+    )
     @action(detail=True, methods=['post'])
     def request_changes(self, request, pk=None):
         """POST /posts/{id}/request_changes"""
