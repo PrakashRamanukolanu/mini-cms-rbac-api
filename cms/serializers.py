@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Role
+from .models import Role, Post, Page
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
@@ -46,3 +46,31 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['roles'] = [role.name for role in self.user.roles.all()]
         return data
 
+
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'title', 'slug',
+            'body', 'status', 'author',
+            'published_at', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'slug', 'author',
+            'status', 'published_at',
+            'created_at', 'updated_at']
+
+
+class PostCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['title', 'body']
+
+
+class PageSerializer(serializers.ModelSerializer):
+    author_id = serializers.ReadOnlyField(source='author.id')
+    slug = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Page
+        fields = ['id', 'title', 'slug', 'body', 'status', 'author_id',
+                  'published_at', 'created_at', 'updated_at', 'is_deleted']
